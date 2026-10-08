@@ -1,0 +1,9 @@
+# Bundle id for the iOS WebView shell. Must match project.yml.
+app_identifier("fun.studydesk.app")
+
+# Apple ID used for login fallbacks (pilot/match prefer the API key).
+apple_id(ENV["APPLE_ID"])
+
+# Optional: set these if the Apple ID belongs to multiple teams.
+# team_id(ENV["APPLE_TEAM_ID"])
+# itc_team_id(ENV["ITC_TEAM_ID"])

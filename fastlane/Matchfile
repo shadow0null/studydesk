@@ -1,0 +1,11 @@
+# match (fastlane code signing): certificates + provisioning profiles live in
+# the private git repo at MATCH_GIT_URL, encrypted with MATCH_PASSWORD.
+git_url(ENV.fetch("MATCH_GIT_URL", ""))
+
+storage_mode("git")
+type("appstore") # The default; the beta lane passes appstore explicitly.
+
+# Bundle ids match must manage. Keep in sync with project.yml.
+app_identifier(["fun.studydesk.app"])
+
+username(ENV["APPLE_ID"])
