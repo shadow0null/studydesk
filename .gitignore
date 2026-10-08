@@ -1,0 +1,33 @@
+# Xcode / macOS
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+DerivedData/
+*.moved-aside
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+
+# xcodegen
+# (keep project.yml; the generated .xcodeproj is gitignored by default)
+*.xcodeproj
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Bundler
+.bundle/
+vendor/bundle/
+
+# Env / secrets — NEVER commit these
+.env
+*.p8
+*.mobileprovision
+*.cer
+
+# Misc
+.DS_Store
