@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>StudyDesk</string>
+	<key>CFBundleIdentifier</key>
+	<string>fun.studydesk.app</string>
+	<key>CFBundleName</key>
+	<string>StudyDesk</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>fun.studydesk.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>studydesk</string>
+			</array>
+		</dict>
+	</array>
+	<!-- getUserMedia (camera/mic) works natively in WKWebView on iOS 14.3+. -->
+	<key>NSCameraUsageDescription</key>
+	<string>StudyDesk needs camera access for video calls and study check-ins inside the web app.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>StudyDesk needs microphone access for voice notes and calls inside the web app.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>StudyDesk needs permission to save downloaded files and images to your photo library.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>StudyDesk may use your location for location-aware study features in the web app.</string>
+</dict>
+</plist>
