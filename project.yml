@@ -1,0 +1,44 @@
+# xcodegen project for the StudyDesk iOS WebView shell.
+# Generate with: xcodegen generate
+name: StudyDesk
+options:
+  bundleIdPrefix: fun.studydesk
+  deploymentTarget:
+    iOS: "16.1"
+  xcodeVersion: "15.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  StudyDesk:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.1"
+    bundleId: fun.studydesk.app
+    sources:
+      - path: StudyDesk
+        excludes:
+          - "**/Assets.xcassets"
+    resources:
+      - StudyDesk/Assets.xcassets
+    info:
+      path: StudyDesk/Info.plist
+    entitlements:
+      path: StudyDesk/StudyDesk.entitlements
+    settings:
+      base:
+        PRODUCT_NAME: StudyDesk
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: "" # INFERRED: fill in your Apple Developer Team ID (fastlane match or Xcode can set it)
+        INFOPLIST_FILE: StudyDesk/Info.plist
+        CODE_SIGN_ENTITLEMENTS: StudyDesk/StudyDesk.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_VERSION: "5.0"
+
+# NOTE (honest): this project has NOT been built — no macOS available in this
+# environment. The GitHub workflow (testflight.yml) generates and archives it
+# on a macOS runner.
