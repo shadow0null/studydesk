@@ -71,9 +71,9 @@ jobs:
 
   testflight:
     needs: compile-check
-    # Only attempt the signed TestFlight upload when the App Store Connect
-    # secrets exist; otherwise skip quietly (compile-check is the signal).
-    if: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID != '' }}
+    # NOTE: `secrets` is NOT available in a job-level `if:` (GitHub rejects the
+    # workflow file at parse time). The signed upload is instead gated per-step
+    # on the env var below, which is empty when the secret is not configured.
     runs-on: macos-14
     timeout-minutes: 60
     env:
@@ -91,22 +91,30 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
+      - name: No TestFlight secrets — skipping signed upload
+        if: ${{ env.APP_STORE_CONNECT_API_KEY_ID == '' }}
+        run: echo "TestFlight secrets are not configured; the signed upload is skipped. compile-check is the build signal."
+
       - name: Select Xcode
+        if: ${{ env.APP_STORE_CONNECT_API_KEY_ID != '' }}
         run: |
           sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer \
             || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
 
       - name: Set up Ruby
+        if: ${{ env.APP_STORE_CONNECT_API_KEY_ID != '' }}
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.2"
           bundler-cache: true
 
       - name: Install dependencies
+        if: ${{ env.APP_STORE_CONNECT_API_KEY_ID != '' }}
         run: bundle install
 
       - name: Install xcodegen
+        if: ${{ env.APP_STORE_CONNECT_API_KEY_ID != '' }}
         run: |
           if ! command -v xcodegen >/dev/null 2>&1; then
             brew install xcodegen
@@ -114,7 +122,9 @@ jobs:
           xcodegen --version
 
       - name: Generate Xcode project
+        if: ${{ env.APP_STORE_CONNECT_API_KEY_ID != '' }}
         run: xcodegen generate
 
       - name: Build and upload to TestFlight
+        if: ${{ env.APP_STORE_CONNECT_API_KEY_ID != '' }}
         run: bundle exec fastlane beta
