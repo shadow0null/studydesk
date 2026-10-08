@@ -1,0 +1,120 @@
+# Builds the StudyDesk iOS WebView shell.
+#
+# GITHUB-ONLY BUILD: no local Xcode is assumed. The macOS runner does:
+#   xcodegen generate → xcodebuild (compile check, no signing) → fastlane beta (TestFlight)
+#
+# Two jobs:
+#   compile-check — runs on EVERY push/PR with ZERO secrets. Proves the Swift
+#     actually compiles (CODE_SIGNING_ALLOWED=NO). This is the signal to watch
+#     before any Apple Developer account exists.
+#   testflight — only runs when the App Store Connect secrets are present
+#     (skipped otherwise). Runs fastlane beta: archive → export → TestFlight.
+#
+# Required GitHub Secrets for the testflight job (documented in README.md):
+#   APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_ISSUER_ID,
+#   APP_STORE_CONNECT_API_KEY_CONTENT (base64 .p8),
+#   MATCH_GIT_URL, MATCH_PASSWORD, APPLE_ID
+#
+# Scheme/target cross-check: project.yml defines project name "StudyDesk"
+# and target "StudyDesk" → xcodegen generates scheme "StudyDesk".
+# The Fastfile calls build_app(scheme: "StudyDesk") — keep these in sync.
+
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compile-check:
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        # macos-14 images ship multiple Xcodes; pin one with iOS 17+ SDKs.
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer \
+            || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install xcodegen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Verify AppIcon exists
+        # The build fails late and cryptically without the icon; fail fast.
+        run: |
+          test -f StudyDesk/Assets.xcassets/AppIcon.appiconset/AppIcon.png \
+            || { echo "::error::Add StudyDesk/Assets.xcassets/AppIcon.appiconset/AppIcon.png (1024x1024) before building."; exit 1; }
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Compile (no code signing)
+        run: |
+          xcodebuild -project StudyDesk.xcodeproj \
+            -scheme StudyDesk \
+            -destination 'generic/platform=iOS' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+  testflight:
+    needs: compile-check
+    # Only attempt the signed TestFlight upload when the App Store Connect
+    # secrets exist; otherwise skip quietly (compile-check is the signal).
+    if: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID != '' }}
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      FASTLANE_SKIP_UPDATE_CHECK: "true"
+      FASTLANE_HIDE_CHANGELOG: "true"
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer \
+            || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+
+      - name: Install dependencies
+        run: bundle install
+
+      - name: Install xcodegen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build and upload to TestFlight
+        run: bundle exec fastlane beta
