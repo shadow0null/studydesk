@@ -46,9 +46,13 @@ final class WebViewController: UIViewController {
     private var firstLoadFinished = false
     private var timerHookRetry: DispatchWorkItem?
 
-    /// Tracks where each in-flight WKDownload should land, so
-    /// downloadDidFinish can present the right file.
-    private var downloadDestinations: [ObjectIdentifier: URL] = [:]
+    /// Owns download handling. WKDownloadDelegate is (unlike
+    /// WKNavigationDelegate/WKUIDelegate) NOT @MainActor-annotated in the
+    /// iOS 18 SDK, so its witnesses must be nonisolated — a separate plain
+    /// NSObject subclass keeps the @MainActor view controller out of the
+    /// conformance entirely. (Swift 6 otherwise reports "does not conform
+    /// to protocol 'WKDownloadDelegate'" on the extension.)
+    private let downloadHandler = DownloadDelegate()
 
     private static var homeURL: URL {
         // Static literal; preconditionFailure (not a force-unwrap) if it ever
@@ -66,6 +70,15 @@ final class WebViewController: UIViewController {
         setupWebView()
         layoutWebView()
         setupPullToRefresh()
+
+        // Download finish → share sheet. The callback runs in a nonisolated
+        // context, so it hops to the main actor for the @MainActor Downloads
+        // helper. The closure itself captures no isolated state.
+        downloadHandler.onFinished = { url in
+            Task { @MainActor in
+                Downloads.shared.presentShareSheet(for: url)
+            }
+        }
 
         // Hand the WebView to the bridge layer (all weak references).
         // viewDidLoad always runs on the main thread; assumeIsolated keeps
@@ -230,7 +243,7 @@ extension WebViewController: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
-        download.delegate = self
+        download.delegate = downloadHandler
     }
 }
 
@@ -253,9 +266,30 @@ extension WebViewController: WKUIDelegate {
     }
 }
 
-// MARK: - WKDownloadDelegate
+// MARK: - Download handling (nonisolated delegate)
 
-extension WebViewController: WKDownloadDelegate {
+/// WKDownloadDelegate conformance, kept off the @MainActor view controller.
+///
+/// Why a separate class: this target builds in Swift 6 language mode, where
+/// UIViewController (and therefore WebViewController and all of its
+/// extensions) is @MainActor-isolated. WKNavigationDelegate and WKUIDelegate
+/// are @MainActor-annotated in the iOS 18 SDK, so conforming to them in
+/// extensions is fine — but WKDownloadDelegate is intentionally NOT
+/// @MainActor-annotated, and a @MainActor-inherited witness cannot satisfy
+/// its nonisolated requirements (the compiler reports "type does not conform
+/// to protocol 'WKDownloadDelegate'"). A plain NSObject subclass is
+/// nonisolated, so its witnesses match. Only the final share sheet hops to
+/// the main actor, via the onFinished callback.
+final class DownloadDelegate: NSObject, WKDownloadDelegate {
+
+    /// Where each in-flight download should land, so downloadDidFinish can
+    /// present the right file.
+    private var destinations: [ObjectIdentifier: URL] = [:]
+
+    /// Invoked with the saved file URL when a download finishes. Called from
+    /// a nonisolated context — hop to @MainActor inside the closure before
+    /// touching UI.
+    var onFinished: ((URL) -> Void)?
 
     func webView(
         _ webView: WKWebView,
@@ -265,25 +299,28 @@ extension WebViewController: WKDownloadDelegate {
         completionHandler: @escaping (URL?) -> Void
     ) {
         // Save into the app's Documents directory.
-        guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            completionHandler(nil)
-            return
+        let destination = FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent(suggestedFilename)
+        if let destination {
+            destinations[ObjectIdentifier(download)] = destination
         }
-        let destination = documents.appendingPathComponent(suggestedFilename)
-        downloadDestinations[ObjectIdentifier(download)] = destination
         completionHandler(destination)
     }
 
     func webView(_ webView: WKWebView, downloadDidFinish download: WKDownload) {
-        defer { downloadDestinations.removeValue(forKey: ObjectIdentifier(download)) }
-        guard let destination = downloadDestinations[ObjectIdentifier(download)] else { return }
-        Task { @MainActor in
-            Downloads.shared.presentShareSheet(for: destination)
-        }
+        defer { destinations.removeValue(forKey: ObjectIdentifier(download)) }
+        guard let destination = destinations[ObjectIdentifier(download)] else { return }
+        onFinished?(destination)
     }
 
-    func webView(_ webView: WKWebView, download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
-        downloadDestinations.removeValue(forKey: ObjectIdentifier(download))
+    func webView(
+        _ webView: WKWebView,
+        download: WKDownload,
+        didFailWithError error: any Error,
+        resumeData: Data?
+    ) {
+        destinations.removeValue(forKey: ObjectIdentifier(download))
         // Honest: surface download failures where the user can see them.
         // A production polish step could toast this inside the page; for now
         // we log and stay silent rather than crash.
